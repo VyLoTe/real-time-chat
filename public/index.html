@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Realtime Chat</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div id="container">
+    <div id="sidebar">
+      <h2>Online Users</h2>
+      <ul id="online-users"></ul>
+    </div>
+    <div id="main-chat">
+      <div id="chat-tabs"></div>
+      <div id="chat-windows"></div>
+      <form id="form" action="">
+        <input id="input" autocomplete="off" placeholder="Select a user to chat with" disabled /><button id="sendButton" disabled>Send</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    var socket = io();
+
+    var form = document.getElementById('form');
+    var input = document.getElementById('input');
+    var sendButton = document.getElementById('sendButton');
+    var onlineUsersList = document.getElementById('online-users');
+    var chatTabs = document.getElementById('chat-tabs');
+    var chatWindows = document.getElementById('chat-windows');
+
+    var myGoogleId = null;
+    var activeChats = {}; // Stores { roomId: { participants: [], messages: [], element: ulElement } }
+    var currentRoomId = null;
+
+    // Function to switch between chat rooms
+    function switchChat(roomId) {
+      // Deactivate current tab and window
+      if (currentRoomId) {
+        const prevTab = document.querySelector(`.chat-tab[data-room-id="${currentRoomId}"]`);
+        const prevWindow = document.querySelector(`.chat-window[data-room-id="${currentRoomId}"]`);
+        if (prevTab) prevTab.classList.remove('active');
+        if (prevWindow) prevWindow.classList.remove('active');
+      }
+
+      // Activate new tab and window
+      const newTab = document.querySelector(`.chat-tab[data-room-id="${roomId}"]`);
+      const newWindow = document.querySelector(`.chat-window[data-room-id="${roomId}"]`);
+      if (newTab) newTab.classList.add('active');
+      if (newWindow) newWindow.classList.add('active');
+
+      currentRoomId = roomId;
+      input.focus();
+      // Enable input and send button, update placeholder
+      input.disabled = false;
+      input.placeholder = "Type your message...";
+      sendButton.disabled = false;
+      // Scroll to bottom of the active chat window
+      if (newWindow) {
+        newWindow.scrollTop = newWindow.scrollHeight;
+      }
+    }
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      console.log('Attempting to send message.');
+      console.log('Input value:', input.value);
+      console.log('Current Room ID:', currentRoomId);
+      if (input.value && currentRoomId) {
+        console.log('Sending chat message:', { message: input.value, roomId: currentRoomId });
+        socket.emit('chat message', { message: input.value, roomId: currentRoomId });
+        input.value = '';
+      } else if (!currentRoomId) {
+        alert('Please select a user to chat with first.');
+      } else {
+        console.warn('Cannot send message: input empty.', { input: input.value, currentRoomId: currentRoomId });
+      }
+    });
+
+    socket.on('authenticated_id', function(id) {
+      myGoogleId = id;
+      console.log('My authenticated Google ID:', myGoogleId);
+    });
+
+    socket.on('online_users', function(users) {
+      console.log('Received online users:', users);
+      onlineUsersList.innerHTML = ''; // Clear existing list
+      users.forEach(user => {
+        if (user.id !== myGoogleId) { // Don't list self
+          var li = document.createElement('li');
+          var img = document.createElement('img');
+          img.src = user.photo || '/default-avatar.png'; // Use a default avatar if none is provided
+          img.classList.add('avatar');
+          li.appendChild(img);
+          li.appendChild(document.createTextNode(user.displayName));
+          li.setAttribute('data-user-id', user.id);
+          li.addEventListener('click', function() {
+            console.log('Initiating private chat with:', user.id);
+            socket.emit('initiate_private_chat', user.id);
+          });
+          onlineUsersList.appendChild(li);
+        } else {
+          var li = document.createElement('li');
+          li.textContent = user.displayName + ' (You)';
+          li.classList.add('self');
+          onlineUsersList.appendChild(li);
+        }
+      });
+    });
+
+    socket.on('private_chat_initiated', function(data) {
+      console.log('Private chat initiated:', data);
+      const { roomId, participants } = data;
+      if (!activeChats[roomId]) {
+        // Create new chat tab
+        const tab = document.createElement('div');
+        tab.classList.add('chat-tab');
+        tab.setAttribute('data-room-id', roomId);
+        const otherParticipant = participants.find(p => p !== myGoogleId);
+        // Find display name of other participant
+        const otherUserElement = document.querySelector(`#online-users li[data-user-id="${otherParticipant}"]`);
+        tab.textContent = otherUserElement ? otherUserElement.textContent : 'Unknown User';
+        tab.addEventListener('click', () => {
+          console.log('Switching to chat room:', roomId);
+          switchChat(roomId);
+        });
+        chatTabs.appendChild(tab);
+
+        // Create new chat window
+        const chatWindow = document.createElement('div');
+        chatWindow.classList.add('chat-window');
+        chatWindow.setAttribute('data-room-id', roomId);
+        const messagesUl = document.createElement('ul');
+        messagesUl.classList.add('chat-messages');
+        chatWindow.appendChild(messagesUl);
+        chatWindows.appendChild(chatWindow);
+
+        activeChats[roomId] = {
+          participants: participants,
+          messages: [],
+          element: messagesUl
+        };
+      }
+      switchChat(roomId);
+    });
+
+    socket.on('chat message', function(data) {
+      console.log('Received chat message:', data);
+      const { message, senderId, senderDisplayName, senderPhoto, roomId } = data;
+      if (activeChats[roomId]) {
+        var item = document.createElement('li');
+
+        var messageSpan = document.createElement('span');
+        if (senderId === myGoogleId) {
+          messageSpan.textContent = message;
+          item.classList.add('self-message');
+        } else {
+          messageSpan.textContent = message;
+          item.classList.add('other-message');
+        }
+        item.appendChild(messageSpan);
+        activeChats[roomId].element.appendChild(item);
+        // Scroll to bottom if this is the active chat
+        if (currentRoomId === roomId) {
+          activeChats[roomId].element.parentElement.scrollTop = activeChats[roomId].element.parentElement.scrollHeight;
+        }
+      }
+    });
+
+    socket.on('chat_error', function(msg) {
+      console.error('Chat Error:', msg);
+      alert('Chat Error: ' + msg);
+    });
+
+    socket.on('auth_required', function(msg) {
+      console.warn('Authentication required:', msg);
+      alert(msg);
+      window.location.href = '/';
+    });
+  </script>
+</body>
+</html>
