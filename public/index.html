@@ -19,6 +19,9 @@
     </div>
   </div>
 
+  <audio id="send-sound" src="/sounds/send.mp3" preload="auto"></audio>
+  <audio id="notification-sound" src="/sounds/receive.mp3" preload="auto"></audio>
+
   <script src="/socket.io/socket.io.js"></script>
   <script>
     var socket = io();
@@ -29,6 +32,8 @@
     var onlineUsersList = document.getElementById('online-users');
     var chatTabs = document.getElementById('chat-tabs');
     var chatWindows = document.getElementById('chat-windows');
+    var sendSound = document.getElementById('send-sound');
+    var notificationSound = document.getElementById('notification-sound');
 
     var myGoogleId = null;
     var activeChats = {}; // Stores { roomId: { participants: [], messages: [], element: ulElement } }
@@ -70,6 +75,7 @@
       if (input.value && currentRoomId) {
         console.log('Sending chat message:', { message: input.value, roomId: currentRoomId });
         socket.emit('chat message', { message: input.value, roomId: currentRoomId });
+        sendSound.play();
         input.value = '';
       } else if (!currentRoomId) {
         alert('Please select a user to chat with first.');
@@ -156,6 +162,7 @@
           messageSpan.textContent = message;
           item.classList.add('self-message');
         } else {
+          notificationSound.play();
           messageSpan.textContent = message;
           item.classList.add('other-message');
         }
