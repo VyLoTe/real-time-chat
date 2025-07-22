@@ -65,6 +65,7 @@ body {
     display: flex;
     flex-direction: column;
     position: relative;
+    overflow: hidden;
 }
 
 #menu-toggle {
@@ -120,6 +121,7 @@ body {
     padding: 10px;
     background: #fff;
     position: relative;
+    scrollbar-gutter: stable;
 }
 
 .chat-window {

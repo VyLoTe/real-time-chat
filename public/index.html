@@ -47,6 +47,11 @@
     var activeChats = {}; // Stores { roomId: { participants: [], messages: [], element: ulElement } }
     var currentRoomId = null;
 
+    function formatMessage(message) {
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      return message.replace(urlRegex, '<a href="$1" target="_blank">$1</a>');
+    }
+
     // Function to switch between chat rooms
     function switchChat(roomId) {
       // Deactivate current tab and window
@@ -181,10 +186,10 @@
           const item = document.createElement('li');
           const messageSpan = document.createElement('span');
           if (msg.senderId === myGoogleId) {
-            messageSpan.textContent = msg.message;
+            messageSpan.innerHTML = formatMessage(msg.message);
             item.classList.add('self-message');
           } else {
-            messageSpan.textContent = msg.message;
+            messageSpan.innerHTML = formatMessage(msg.message);
             item.classList.add('other-message');
           }
           item.appendChild(messageSpan);
@@ -209,7 +214,7 @@
 
         if (message) {
             var messageSpan = document.createElement('span');
-            messageSpan.textContent = message;
+            messageSpan.innerHTML = formatMessage(message);
             item.appendChild(messageSpan);
         } else if (file) {
             if (fileType.startsWith('image/')) {
