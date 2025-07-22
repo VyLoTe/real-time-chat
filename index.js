@@ -85,7 +85,7 @@ io.use((socket, next) => {
     sessionMiddleware(socket.request, socket.request.res || {}, next);
 });
 
-let connectedUsers = {}; // Maps Google ID to { socketId: string, displayName: string }
+let connectedUsers = {}; // Maps Google ID to { displayName: string, photo: string, socketIds: string[] }
 let userRooms = {}; // Maps userId to an array of roomIds they are in
 let chatHistory = {}; // Maps roomId to an array of message objects
 
@@ -110,12 +110,15 @@ io.on('connection', (socket) => {
 
     const userDisplayName = socket.request.session.passport ? socket.request.session.passport.user.displayName : userId;
     const userPhoto = socket.request.session.passport ? socket.request.session.passport.user.photo : null;
-    connectedUsers[userId] = { socketId: socket.id, displayName: userDisplayName, photo: userPhoto }; // Store socket ID, display name, and photo for this user
+    if (!connectedUsers[userId]) {
+        connectedUsers[userId] = { displayName: userDisplayName, photo: userPhoto, socketIds: [] };
+    }
+    connectedUsers[userId].socketIds.push(socket.id);
     userRooms[userId] = userRooms[userId] || []; // Initialize rooms for user if not exists
     // Send the authenticated user's ID to the client
     socket.emit('authenticated_id', userId);
 
-    console.log(`User ${userId} (${socket.request.session.passport.user.displayName}) connected.`);
+    console.log(`User ${userId} (${socket.request.session.passport.user.displayName}) connected with socket ${socket.id}.`);
     emitOnlineUsers();
 
     // Event to initiate a private chat
@@ -133,18 +136,32 @@ io.on('connection', (socket) => {
         const participants = [userId, targetUserId].sort();
         const roomId = `private_${participants[0]}_${participants[1]}`;
 
-        // Make both users join the room
-        socket.join(roomId);
-        const targetSocket = io.sockets.sockets.get(connectedUsers[targetUserId].socketId);
-        if (targetSocket) {
-            targetSocket.join(roomId);
+        // Make all sockets for both users join the room
+        const initiatorConnections = connectedUsers[userId];
+        if (initiatorConnections && initiatorConnections.socketIds) {
+            initiatorConnections.socketIds.forEach(socketId => {
+                const initiatorSocket = io.sockets.sockets.get(socketId);
+                if (initiatorSocket) {
+                    initiatorSocket.join(roomId);
+                }
+            });
+        }
+
+        const targetConnections = connectedUsers[targetUserId];
+        if (targetConnections && targetConnections.socketIds) {
+            targetConnections.socketIds.forEach(socketId => {
+                const targetSocket = io.sockets.sockets.get(socketId);
+                if (targetSocket) {
+                    targetSocket.join(roomId);
+                }
+            });
         }
 
         // Add room to userRooms for both participants
         if (!userRooms[userId].includes(roomId)) {
             userRooms[userId].push(roomId);
         }
-        if (targetSocket && !userRooms[targetUserId].includes(roomId)) {
+        if (connectedUsers[targetUserId] && !userRooms[targetUserId].includes(roomId)) {
             userRooms[targetUserId].push(roomId);
         }
 
@@ -195,17 +212,18 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        console.log(`User ${userId} disconnected.`);
-        delete connectedUsers[userId];
-        emitOnlineUsers();
-
-        // Make the user leave all rooms they were in
-        if (userRooms[userId]) {
-            userRooms[userId].forEach(roomId => {
-                socket.leave(roomId);
-            });
-            delete userRooms[userId];
+        console.log(`User ${userId} with socket ${socket.id} disconnected.`);
+        if (connectedUsers[userId]) {
+            connectedUsers[userId].socketIds = connectedUsers[userId].socketIds.filter(id => id !== socket.id);
+            if (connectedUsers[userId].socketIds.length === 0) {
+                delete connectedUsers[userId];
+                console.log(`User ${userId} completely disconnected.`);
+                if (userRooms[userId]) {
+                    delete userRooms[userId];
+                }
+            }
         }
+        emitOnlineUsers();
     });
 });
 

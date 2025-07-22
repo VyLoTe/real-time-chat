@@ -68,18 +68,32 @@ body {
     overflow: hidden;
 }
 
-#menu-toggle {
-    display: none; /* Hidden by default */
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    z-index: 1000;
-    background: #333;
+#navbar {
+    display: none; /* Hidden by default, shown in media query */
+    background-color: #333;
     color: white;
+    padding: 10px;
+    text-align: center;
+    position: fixed;
+    top: 0;
+    width: 100%;
+    z-index: 1001;
+}
+
+#navbar-title {
+    margin: 0;
+    font-size: 1.2em;
+}
+
+#menu-toggle {
+    position: absolute;
+    top: 5px;
+    left: 10px;
+    background: none;
     border: none;
-    padding: 5px 10px;
+    color: white;
+    font-size: 24px;
     cursor: pointer;
-    border-radius: 5px;
 }
 
 #chat-tabs {
@@ -122,6 +136,7 @@ body {
     background: #fff;
     position: relative;
     scrollbar-gutter: stable;
+    padding-bottom: 60px;
 }
 
 .chat-window {
@@ -166,15 +181,14 @@ body {
 #form {
     background: rgba(0, 0, 0, 0.15);
     padding: 0.25rem;
-    position: sticky;
+    position: fixed;
     bottom: 0;
-    left: 0;
+    left: 250px;
     right: 0;
     display: flex;
     height: 50px;
     box-sizing: border-box;
     backdrop-filter: blur(10px);
-    margin-top: auto; /* Pushes the form to the bottom */
 }
 
 #input {
@@ -201,22 +215,30 @@ body {
 
 /* Responsive Styles */
 @media (max-width: 768px) {
+    #navbar {
+        display: block;
+    }
+
+    #main-chat {
+        padding-top: 60px; /* Adjust for fixed navbar */
+        padding-left: 0;
+    }
+
+    #form {
+        left: 0;
+    }
     #sidebar {
-        position: absolute;
+        position: fixed; /* Changed from absolute for better context */
         left: -250px; /* Start off-screen */
         top: 0;
         height: 100%;
-        z-index: 999;
+        z-index: 1002; /* Higher than navbar */
         transition: left 0.3s ease;
         box-shadow: 2px 0 5px rgba(0,0,0,0.1);
     }
 
     #sidebar.open {
         left: 0; /* Slide in */
-    }
-
-    #menu-toggle {
-        display: block; /* Show the button */
     }
 
     #main-chat {
