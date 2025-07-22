@@ -112,7 +112,7 @@ body {
     background: #f9f9f9;
     white-space: nowrap;
 }
-.chat-tabs > :nth-child(n+2) {
+.chat-tab:not(:first-child) {
     padding: 8px 15px;
     cursor: pointer;
     border-bottom: none;
@@ -121,7 +121,6 @@ body {
     background: #f9f9f9;
     white-space: nowrap;
 }
-
 
 .chat-tab.active {
     background: #fff;
