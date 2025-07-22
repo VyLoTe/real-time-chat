@@ -6,6 +6,10 @@ body {
     overflow: hidden;
 }
 
+* {
+    box-sizing: border-box;
+}
+
 #container {
     display: flex;
     width: 100%;
@@ -63,25 +67,46 @@ body {
     position: relative;
 }
 
+#menu-toggle {
+    display: none; /* Hidden by default */
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 1000;
+    background: #333;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
 #chat-tabs {
     display: flex;
     background: #e0e0e0;
-    border-bottom: 1px solid #ccc;
-    padding: 5px 0;
+    padding-top: 5px;
     overflow-x: auto;
+    height: 50px;
 }
 
 .chat-tab {
     padding: 8px 15px;
     cursor: pointer;
-    border: 1px solid #ccc;
     border-bottom: none;
-    margin-right: 5px;
-    border-top-left-radius: 5px;
-    border-top-right-radius: 5px;
+    border-top-right-radius: 15px;
     background: #f9f9f9;
     white-space: nowrap;
 }
+.chat-tabs > :nth-child(n+2) {
+    padding: 8px 15px;
+    cursor: pointer;
+    border-bottom: none;
+    border-top-left-radius: 15px;
+    border-top-right-radius: 15px;
+    background: #f9f9f9;
+    white-space: nowrap;
+}
+
 
 .chat-tab.active {
     background: #fff;
@@ -144,7 +169,7 @@ body {
     left: 0;
     right: 0;
     display: flex;
-    height: 3rem;
+    height: 50px;
     box-sizing: border-box;
     backdrop-filter: blur(10px);
     margin-top: auto; /* Pushes the form to the bottom */
@@ -170,4 +195,52 @@ body {
     border-radius: 3px;
     outline: none;
     color: #fff;
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+    #sidebar {
+        position: absolute;
+        left: -250px; /* Start off-screen */
+        top: 0;
+        height: 100%;
+        z-index: 999;
+        transition: left 0.3s ease;
+        box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+    }
+
+    #sidebar.open {
+        left: 0; /* Slide in */
+    }
+
+    #menu-toggle {
+        display: block; /* Show the button */
+    }
+
+    #main-chat {
+        width: 100%; /* Ensure main chat takes full width */
+    }
+
+    .chat-messages li {
+        max-width: 85%;
+    }
+}
+
+@media (max-width: 480px) {
+    .chat-tab {
+        padding: 6px 10px;
+        font-size: 0.9em;
+    }
+
+    #input {
+        padding: 0 0.75rem;
+    }
+
+    #form > button {
+        padding: 0 0.75rem;
+    }
+
+    .chat-messages li {
+        max-width: 90%;
+    }
 }

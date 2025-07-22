@@ -26,7 +26,7 @@ app.use(passport.session());
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: 'https://real-time-chat-w5t8.onrender.com/auth/google/callback' // Must match Redirect URI in Google Cloud. Also, ensure "https://real-time-chat-w5t8.onrender.com" is in your Authorized JavaScript origins.
+    callbackURL: 'https://real-time-chat-w5t8.onrender.com/auth/google/callback'
 },
 function(accessToken, refreshToken, profile, cb) {
     console.log('Google Profile received:', profile);
@@ -87,6 +87,7 @@ io.use((socket, next) => {
 
 let connectedUsers = {}; // Maps Google ID to { socketId: string, displayName: string }
 let userRooms = {}; // Maps userId to an array of roomIds they are in
+let chatHistory = {}; // Maps roomId to an array of message objects
 
 function emitOnlineUsers() {
     const onlineUsers = Object.keys(connectedUsers).map(userId => ({
@@ -147,21 +148,44 @@ io.on('connection', (socket) => {
             userRooms[targetUserId].push(roomId);
         }
 
+        // Initialize chat history for the room if it doesn't exist
+        if (!chatHistory[roomId]) {
+            chatHistory[roomId] = [];
+        }
+
         console.log(`Private chat initiated between ${userId} and ${targetUserId} in room: ${roomId}`);
-        io.to(roomId).emit('private_chat_initiated', { roomId: roomId, participants: participants });
+        io.to(roomId).emit('private_chat_initiated', { 
+            roomId: roomId, 
+            participants: participants,
+            history: chatHistory[roomId]
+        });
     });
 
     socket.on('chat message', (data) => {
         console.log(`Server received chat message from ${userId}:`, data);
-        // data should contain { message: string, roomId: string }
+        // data can contain { message: string, file: string, fileName: string, fileType: string, roomId: string }
         if (data.roomId && socket.rooms.has(data.roomId)) {
             const messageData = {
-                message: data.message,
-                senderId: userId, // Use Google ID as sender ID
-                senderDisplayName: userDisplayName, // Include sender's display name
-                senderPhoto: userPhoto, // Include sender's photo
+                senderId: userId,
+                senderDisplayName: userDisplayName,
+                senderPhoto: userPhoto,
                 roomId: data.roomId
             };
+
+            if (data.message) {
+                messageData.message = data.message;
+            } else if (data.file) {
+                messageData.file = data.file;
+                messageData.fileName = data.fileName;
+                messageData.fileType = data.fileType;
+            }
+
+            // Store the message in history
+            if (!chatHistory[data.roomId]) {
+                chatHistory[data.roomId] = [];
+            }
+            chatHistory[data.roomId].push(messageData);
+
             console.log(`Server emitting chat message to room ${data.roomId}:`, messageData);
             io.to(data.roomId).emit('chat message', messageData);
         } else {

@@ -11,10 +11,14 @@
       <ul id="online-users"></ul>
     </div>
     <div id="main-chat">
+      <button id="menu-toggle">&#9776;</button>
       <div id="chat-tabs"></div>
       <div id="chat-windows"></div>
       <form id="form" action="">
-        <input id="input" autocomplete="off" placeholder="Select a user to chat with" disabled /><button id="sendButton" disabled>Send</button>
+        <input id="input" autocomplete="off" placeholder="Select a user to chat with" disabled />
+        <input type="file" id="file-input" style="display: none;" accept="image/*,video/*">
+        <button type="button" id="attach-file-button">&#128206;</button>
+        <button id="sendButton" disabled>Send</button>
       </form>
     </div>
   </div>
@@ -26,8 +30,12 @@
   <script>
     var socket = io();
 
+    var menuToggle = document.getElementById('menu-toggle');
+    var sidebar = document.getElementById('sidebar');
     var form = document.getElementById('form');
     var input = document.getElementById('input');
+    var fileInput = document.getElementById('file-input');
+    var attachFileButton = document.getElementById('attach-file-button');
     var sendButton = document.getElementById('sendButton');
     var onlineUsersList = document.getElementById('online-users');
     var chatTabs = document.getElementById('chat-tabs');
@@ -84,6 +92,26 @@
       }
     });
 
+    attachFileButton.addEventListener('click', function() {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', function(e) {
+      var file = e.target.files[0];
+      if (file && currentRoomId) {
+        var reader = new FileReader();
+        reader.onload = function(evt) {
+          socket.emit('chat message', {
+            file: evt.target.result,
+            fileName: file.name,
+            fileType: file.type,
+            roomId: currentRoomId
+          });
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
     socket.on('authenticated_id', function(id) {
       myGoogleId = id;
       console.log('My authenticated Google ID:', myGoogleId);
@@ -117,7 +145,7 @@
 
     socket.on('private_chat_initiated', function(data) {
       console.log('Private chat initiated:', data);
-      const { roomId, participants } = data;
+      const { roomId, participants, history } = data;
       if (!activeChats[roomId]) {
         // Create new chat tab
         const tab = document.createElement('div');
@@ -147,26 +175,59 @@
           messages: [],
           element: messagesUl
         };
+
+        // Load history
+        history.forEach(msg => {
+          const item = document.createElement('li');
+          const messageSpan = document.createElement('span');
+          if (msg.senderId === myGoogleId) {
+            messageSpan.textContent = msg.message;
+            item.classList.add('self-message');
+          } else {
+            messageSpan.textContent = msg.message;
+            item.classList.add('other-message');
+          }
+          item.appendChild(messageSpan);
+          messagesUl.appendChild(item);
+        });
       }
       switchChat(roomId);
     });
 
     socket.on('chat message', function(data) {
       console.log('Received chat message:', data);
-      const { message, senderId, senderDisplayName, senderPhoto, roomId } = data;
+      const { message, file, fileName, fileType, senderId, senderDisplayName, senderPhoto, roomId } = data;
       if (activeChats[roomId]) {
         var item = document.createElement('li');
-
-        var messageSpan = document.createElement('span');
+        
         if (senderId === myGoogleId) {
-          messageSpan.textContent = message;
-          item.classList.add('self-message');
+            item.classList.add('self-message');
         } else {
-          notificationSound.play();
-          messageSpan.textContent = message;
-          item.classList.add('other-message');
+            notificationSound.play();
+            item.classList.add('other-message');
         }
-        item.appendChild(messageSpan);
+
+        if (message) {
+            var messageSpan = document.createElement('span');
+            messageSpan.textContent = message;
+            item.appendChild(messageSpan);
+        } else if (file) {
+            if (fileType.startsWith('image/')) {
+                const img = document.createElement('img');
+                img.src = file;
+                img.style.maxWidth = '200px';
+                img.style.maxHeight = '200px';
+                item.appendChild(img);
+            } else if (fileType.startsWith('video/')) {
+                const video = document.createElement('video');
+                video.src = file;
+                video.controls = true;
+                video.style.maxWidth = '200px';
+                video.style.maxHeight = '200px';
+                item.appendChild(video);
+            }
+        }
+        
         activeChats[roomId].element.appendChild(item);
         // Scroll to bottom if this is the active chat
         if (currentRoomId === roomId) {
@@ -184,6 +245,10 @@
       console.warn('Authentication required:', msg);
       alert(msg);
       window.location.href = '/';
+    });
+
+    menuToggle.addEventListener('click', function() {
+      sidebar.classList.toggle('open');
     });
   </script>
 </body>
